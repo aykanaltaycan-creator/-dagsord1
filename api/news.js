@@ -71,7 +71,7 @@ Teksten skal ligge nær originalen i lengde og innhold.`,
 
 async function rewrite(items, niva) {
   const key = process.env.ANTHROPIC_API_KEY;
-  if (!key) return null;
+  if (!key) return { saker: null, feil: "ANTHROPIC_API_KEY tanımlı değil (Vercel > Settings > Environment Variables)" };
 
   const kilder = items.map((a, i) =>
     `### SAK ${i + 1}\nTITTEL: ${a.tittel}\nINGRESS: ${a.tekst}\nBRØDTEKST: ${a.body || "(mangler)"}`
@@ -96,7 +96,7 @@ Svar KUN med JSON, ingen forklaring:
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "x-api-key": key,
+      "x-api-key": String(key).trim(),
       "anthropic-version": "2023-06-01",
     },
     body: JSON.stringify({
@@ -106,14 +106,17 @@ Svar KUN med JSON, ingen forklaring:
     }),
   });
 
-  if (!r.ok) return null;
-  const d = await r.json();
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    return { saker: null, feil: "Anthropic HTTP " + r.status + " — " + ((d.error && d.error.message) || "").slice(0, 200) };
+  }
   const text = (d.content || []).map((b) => (b.type === "text" ? b.text : "")).join("\n").trim();
   try {
     const arr = JSON.parse(text.replace(/```json/gi, "").replace(/```/g, "").trim());
-    return Array.isArray(arr) ? arr : null;
+    if (!Array.isArray(arr) || !arr.length) throw new Error("dizi değil");
+    return { saker: arr, feil: "" };
   } catch (e) {
-    return null;
+    return { saker: null, feil: "Model yanıtı okunamadı: " + text.slice(0, 160) };
   }
 }
 
@@ -140,7 +143,7 @@ export default async function handler(req, res) {
     const bodies = await Promise.all(items.map((a) => articleBody(a.lenke)));
     items.forEach((a, i) => { a.body = bodies[i]; });
 
-    const skrevet = await rewrite(items, niva);
+    const { saker: skrevet, feil } = await rewrite(items, niva);
     const saker = skrevet
       ? items.map((a, i) => {
           const s = skrevet.find((x) => Number(x.nr) === i + 1) || skrevet[i];
@@ -150,9 +153,10 @@ export default async function handler(req, res) {
         })
       : items.map(({ body, ...a }) => a);
 
-    res.setHeader("Cache-Control", "s-maxage=1800, stale-while-revalidate=3600");
+    res.setHeader("Cache-Control", skrevet ? "s-maxage=1800, stale-while-revalidate=3600" : "no-store");
     res.status(200).json({
       niva: skrevet ? niva : "original",
+      advarsel: skrevet ? "" : ("Uzun metin üretilemedi, ham RSS özeti gösteriliyor. Sebep: " + feil),
       hentet: new Date().toISOString(),
       saker,
     });
