@@ -53,7 +53,7 @@ async function articleBody(url) {
     const paras = (html.match(/<p[^>]*>[\s\S]*?<\/p>/gi) || [])
       .map(decode)
       .filter((p) => p.length > 60 && !/informasjonskapsler|cookies|abonner|kontakt oss/i.test(p));
-    return paras.join(" ").slice(0, 4500);
+    return paras.join(" ").slice(0, 3000);
   } catch (e) {
     return "";
   }
@@ -69,7 +69,7 @@ Behold nyhetsspråkets tone og de fleste fagordene, men del opp de lengste setni
 Teksten skal ligge nær originalen i lengde og innhold.`,
 };
 
-async function rewrite(items, niva) {
+async function rewriteChunk(items, niva) {
   const key = process.env.ANTHROPIC_API_KEY;
   if (!key) return { saker: null, feil: "ANTHROPIC_API_KEY tanımlı değil (Vercel > Settings > Environment Variables)" };
 
@@ -101,7 +101,7 @@ Svar KUN med JSON, ingen forklaring:
     },
     body: JSON.stringify({
       model: MODEL,
-      max_tokens: 8000,
+      max_tokens: 6000,
       messages: [{ role: "user", content: prompt }],
     }),
   });
@@ -124,7 +124,7 @@ export default async function handler(req, res) {
   const feed = FEEDS[req.query.feed] || FEEDS.topp;
   const niva = ["lett", "middels", "original"].includes(req.query.niva) ? req.query.niva : "lett";
   // uzun metin üretimi pahalı, madde sayısını küçük tut
-  const limit = Math.min(parseInt(req.query.limit, 10) || (niva === "original" ? 10 : 5), 12);
+  const limit = Math.min(parseInt(req.query.limit, 10) || (niva === "original" ? 12 : 8), 12);
 
   try {
     const r = await fetch(feed, { headers: { "user-agent": "Dagsord/1.0 (personlig sprakapp)" } });
@@ -143,20 +143,30 @@ export default async function handler(req, res) {
     const bodies = await Promise.all(items.map((a) => articleBody(a.lenke)));
     items.forEach((a, i) => { a.body = bodies[i]; });
 
-    const { saker: skrevet, feil } = await rewrite(items, niva);
-    const saker = skrevet
-      ? items.map((a, i) => {
-          const s = skrevet.find((x) => Number(x.nr) === i + 1) || skrevet[i];
-          return s && s.tekst
-            ? { tittel: s.tittel || a.tittel, tekst: s.tekst, lenke: a.lenke, dato: a.dato }
-            : { tittel: a.tittel, tekst: a.tekst, lenke: a.lenke, dato: a.dato };
-        })
-      : items.map(({ body, ...a }) => a);
+    // dörderli gruplara böl ve paralel gönder: hem hızlı hem süre sınırına takılmaz
+    const CH = 4;
+    const chunks = [];
+    for (let i = 0; i < items.length; i += CH) chunks.push(items.slice(i, i + CH));
+    const sonuclar = await Promise.all(chunks.map((c) => rewriteChunk(c, niva)));
 
-    res.setHeader("Cache-Control", skrevet ? "s-maxage=1800, stale-while-revalidate=3600" : "no-store");
+    const saker = [];
+    let feil = "", basarili = 0;
+    chunks.forEach((c, ci) => {
+      const r = sonuclar[ci];
+      if (r.saker) basarili++; else if (!feil) feil = r.feil;
+      c.forEach((a, i) => {
+        const s = r.saker ? (r.saker.find((x) => Number(x.nr) === i + 1) || r.saker[i]) : null;
+        saker.push(s && s.tekst
+          ? { tittel: s.tittel || a.tittel, tekst: s.tekst, lenke: a.lenke, dato: a.dato }
+          : { tittel: a.tittel, tekst: a.tekst, lenke: a.lenke, dato: a.dato });
+      });
+    });
+
+    res.setHeader("Cache-Control", basarili ? "s-maxage=1800, stale-while-revalidate=3600" : "no-store");
     res.status(200).json({
-      niva: skrevet ? niva : "original",
-      advarsel: skrevet ? "" : ("Uzun metin üretilemedi, ham RSS özeti gösteriliyor. Sebep: " + feil),
+      niva: basarili ? niva : "original",
+      advarsel: basarili === chunks.length ? ""
+        : (basarili ? "Bazı haberler uzun metne çevrilemedi. " : "Uzun metin üretilemedi, ham RSS özeti gösteriliyor. ") + "Sebep: " + feil,
       hentet: new Date().toISOString(),
       saker,
     });
