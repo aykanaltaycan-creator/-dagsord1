@@ -1,0 +1,686 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Dagsord">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="theme-color" content="#E8ECF1">
+<link rel="manifest" href="/manifest.json">
+<title>Dagsord</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600;800&family=Newsreader:opsz,wght@6..72,400;500;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; }
+:root {
+  --ink:#10233A; --blue:#00205B; --blue2:#33628F; --red:#BA0C2F;
+  --paper:#E8ECF1; --card:#FFFFFF; --muted:#63768B; --line:#CCD6E0;
+}
+html, body { height:100%; margin:0; }
+body {
+  background:var(--paper); color:var(--ink);
+  font-family:'Archivo',system-ui,-apple-system,sans-serif;
+  -webkit-font-smoothing:antialiased; -webkit-text-size-adjust:100%;
+  display:flex; flex-direction:column; overflow:hidden;
+}
+:where(button) { font:inherit; color:inherit; background:none; border:none; padding:0; cursor:pointer; }
+:focus-visible { outline:2px solid var(--red); outline-offset:2px; border-radius:2px; }
+
+.mast { padding:16px 20px 12px; border-bottom:1px solid var(--line); }
+.mast h1 { margin:0; font-size:29px; font-weight:800; letter-spacing:-0.035em; color:var(--blue); line-height:1; }
+.mast .sub { margin:6px 0 0; font-size:12.5px; color:var(--muted); font-weight:500; }
+.mast .date { color:var(--red); font-weight:600; }
+
+.body { flex:1; overflow-y:auto; -webkit-overflow-scrolling:touch; padding-bottom:40px; }
+.wrap { max-width:36rem; margin:0 auto; padding:0 20px; }
+
+.feed { margin:0; padding:0; list-style:none; }
+.item { border-bottom:1px solid var(--line); }
+.item button { display:block; width:100%; text-align:left; padding:16px 0; }
+.item h2 { margin:0 0 5px; font-size:19px; font-weight:600; letter-spacing:-0.015em; line-height:1.25; }
+.item p { margin:0; font-family:'Newsreader',Georgia,serif; font-size:15px; line-height:1.5; color:var(--muted);
+  display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
+.item .n { font-size:11px; font-weight:600; color:var(--blue2); display:block; margin-bottom:6px; }
+
+.back { padding:14px 0 4px; font-size:14px; font-weight:600; color:var(--blue2); }
+.read h2 { margin:6px 0 4px; font-size:26px; font-weight:800; letter-spacing:-0.03em; line-height:1.14; }
+.tools { display:flex; gap:9px; align-items:center; flex-wrap:wrap;
+  padding:12px 0 16px; border-bottom:1px solid var(--line); margin-bottom:16px; }
+.chip { font-size:12.5px; font-weight:600; color:var(--blue2); border:1px solid var(--line);
+  border-radius:999px; padding:6px 12px; background:var(--card); text-decoration:none; display:inline-block; }
+.chip.on { background:var(--blue); color:#fff; border-color:var(--blue); }
+
+.prose { font-family:'Newsreader',Georgia,serif; font-size:19.5px; line-height:1.74; }
+.w { display:inline; padding:0 0.5px; border-radius:2px; font:inherit; }
+.w.seen { box-shadow:inset 0 -1px 0 0 rgba(186,12,47,.35); }
+.w.kept { box-shadow:inset 0 -2px 0 0 var(--red); }
+.w:active { background:#F2D9DE; }
+.tr { display:inline-flex; align-items:center; justify-content:center; width:17px; height:17px;
+  border-radius:50%; border:1px solid var(--line); font-family:'Archivo',sans-serif;
+  font-size:8.5px; font-weight:700; color:var(--blue2); vertical-align:2px; margin:0 3px; background:var(--card); }
+.tr.on { background:var(--blue); color:#fff; border-color:var(--blue); }
+.trline { display:block; font-family:'Archivo',sans-serif; font-size:15px; line-height:1.55;
+  color:var(--blue2); border-left:2px solid var(--line); padding:5px 0 5px 11px; margin:9px 0 13px; }
+.trline em { font-style:normal; color:var(--muted); font-size:12px; display:block; margin-bottom:3px; }
+
+.scrim { position:fixed; inset:0; background:rgba(16,35,58,.42); z-index:40; }
+.sheet { position:fixed; left:0; right:0; bottom:0; z-index:41; background:var(--card);
+  border-radius:20px 20px 0 0; padding:8px 22px calc(26px + env(safe-area-inset-bottom));
+  max-height:80%; overflow-y:auto; box-shadow:0 -8px 40px rgba(16,35,58,.18);
+  animation:up .22s cubic-bezier(.22,1,.36,1); }
+@keyframes up { from { transform:translateY(100%); } to { transform:translateY(0); } }
+@media (prefers-reduced-motion:reduce) { .sheet { animation:none; } }
+.grab { width:38px; height:4px; border-radius:2px; background:var(--line); margin:0 auto 16px; }
+.sheet .hw { font-size:28px; font-weight:800; letter-spacing:-0.03em; margin:0; }
+.sheet .meta { font-size:13px; color:var(--muted); margin:3px 0 16px; font-weight:500; }
+.sheet .mean { font-family:'Newsreader',Georgia,serif; font-size:22px; line-height:1.35; color:var(--blue); margin:0 0 10px; }
+.sheet .note { font-size:14px; line-height:1.55; color:var(--muted); margin:0 0 16px; }
+.ex { border-top:1px solid var(--line); padding-top:14px; margin-bottom:18px; }
+.ex .nb { font-family:'Newsreader',Georgia,serif; font-size:17px; margin:0 0 4px; }
+.ex .tk { font-size:13.5px; color:var(--muted); margin:0; }
+.add { width:100%; padding:14px; border-radius:12px; background:var(--blue); color:#fff; font-weight:600; font-size:15px; }
+.add.done { background:var(--paper); color:var(--blue2); }
+.skel { height:13px; border-radius:3px; background:var(--paper); margin-bottom:9px; }
+.err { font-family:ui-monospace,Menlo,monospace; font-size:11.5px; line-height:1.5; color:var(--red);
+  background:#F7E9EC; border-radius:8px; padding:9px 11px; margin:0 0 14px; white-space:pre-wrap; word-break:break-word; }
+
+.wl { list-style:none; margin:0; padding:8px 0 0; }
+.wl li { display:flex; align-items:baseline; gap:12px; padding:13px 0; border-bottom:1px solid var(--line); }
+.wl .o { font-size:17px; font-weight:600; letter-spacing:-0.01em; }
+.wl .t { font-family:'Newsreader',Georgia,serif; font-size:16px; color:var(--blue2); flex:1; }
+.wl .x { font-size:20px; color:var(--line); padding:0 4px; }
+
+.grid { display:grid; gap:2px; margin:6px 0 20px; }
+.cell { position:relative; aspect-ratio:1; }
+.cell.void { background:transparent; }
+.cell input { position:absolute; inset:0; width:100%; height:100%; text-align:center;
+  border:1px solid var(--line); border-radius:2px; background:var(--card); padding:0;
+  font-family:'Archivo',sans-serif; font-weight:600; font-size:clamp(11px,3.6vw,18px);
+  color:var(--ink); text-transform:uppercase; -webkit-appearance:none; }
+.cell.hi input { background:#DCE6F1; border-color:var(--blue2); }
+.cell.cur input { background:#C4D6E8; border-color:var(--blue); }
+.cell.bad input { color:var(--red); }
+.cell .num { position:absolute; top:1px; left:2px; font-size:8.5px; font-weight:600; color:var(--muted); z-index:1; pointer-events:none; }
+.cluehead { font-size:13px; font-weight:700; color:var(--blue); margin:20px 0 6px; }
+.clue { display:flex; gap:9px; width:100%; text-align:left; padding:8px 0; font-size:14.5px; line-height:1.4; }
+.clue .cn { font-weight:700; color:var(--blue2); min-width:16px; }
+.clue.act { color:var(--red); }
+.row { display:flex; gap:9px; margin:16px 0 4px; }
+.row button { flex:1; padding:12px 8px; border-radius:11px; font-size:14px; font-weight:600;
+  border:1px solid var(--line); background:var(--card); }
+.row button.pri { background:var(--blue); color:#fff; border-color:var(--blue); }
+
+.empty { padding:48px 0; text-align:center; }
+.empty h3 { font-size:19px; font-weight:700; margin:0 0 8px; letter-spacing:-0.02em; }
+.empty p { font-size:14.5px; line-height:1.55; color:var(--muted); margin:0 auto 20px; max-width:22rem; }
+.status { padding:40px 0; text-align:center; font-size:14px; color:var(--muted); }
+
+.tabs { display:flex; border-top:1px solid var(--line); background:var(--card); padding-bottom:env(safe-area-inset-bottom); }
+.tabs button { flex:1; padding:12px 4px 13px; font-size:12px; font-weight:600; color:var(--muted); }
+.tabs button.on { color:var(--blue); box-shadow:inset 0 2px 0 0 var(--red); }
+.badge { display:inline-block; min-width:17px; padding:0 4px; margin-left:5px; border-radius:9px;
+  background:var(--red); color:#fff; font-size:10px; line-height:16px; }
+</style>
+</head>
+<body>
+
+<header class="mast">
+  <div class="wrap" style="padding:0">
+    <h1>Dagsord</h1>
+    <p class="sub"><span class="date" id="dateline"></span> <span id="tagline">— Norveççe haberler, kolay dilde.</span></p>
+  </div>
+</header>
+
+<main class="body"><div class="wrap" id="view"></div></main>
+<div id="sheetHost"></div>
+
+<nav class="tabs">
+  <button data-tab="news" class="on">Haberler</button>
+  <button data-tab="words">Kelimeler<span class="badge" id="wcount" hidden></span></button>
+  <button data-tab="game">Bulmaca</button>
+</nav>
+
+<script>
+/* =================== durum =================== */
+const S = {
+  tab: "news", saker: [], live: false, level: "", open: null,
+  seen: new Set(), words: [], trans: {}, busy: null, err: "",
+  puz: null, ans: {}, cur: null, dir: "A", bad: {}, msg: "", sheet: null,
+};
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
+  ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+/* =================== kayıt =================== */
+const KEY = "dagsord:ord";
+function loadWords() { try { return JSON.parse(localStorage.getItem(KEY) || "[]"); } catch (e) { return []; } }
+function saveWords() { try { localStorage.setItem(KEY, JSON.stringify(S.words)); } catch (e) {} }
+
+/* =================== yerleşik sözlük (yedek) =================== */
+const DICT = {};
+`en=bir. ei=bir (dişil). et=bir (nötr). jeg=ben. du=sen. han=o (erkek). hun=o (kadın). vi=biz.
+dere=siz. de=onlar. den=o. det=o, bu. denne=bu. dette=bu. disse=bunlar. og=ve. men=ama.
+eller=veya. som=ki, gibi. at=ki. fordi=çünkü. hvis=eğer. når=-diğinde. i=içinde, -de.
+på=üstünde, -de. til=-e. fra=-den. med=ile. av=-in, -den. om=hakkında. for=için. etter=sonra.
+før=önce. over=üstünde. under=altında. ved=yanında. hos=yanında. uten=-siz. mot=-e karşı.
+gjennom=içinden. mellom=arasında. ikke=değil. her=burada. der=orada. nå=şimdi. da=o zaman.
+alltid=her zaman. aldri=asla. ofte=sık sık. kanskje=belki. også=ayrıca. bare=sadece.
+veldig=çok. mye=çok. mange=birçok. lite=az. få=az sayıda. mer=daha çok. mest=en çok.
+flere=daha fazla. alle=herkes. noen=bazı. ingen=hiç kimse. er=-dir. var=-di. har=sahip.
+hadde=sahipti. blir=olur. ble=oldu. være=olmak. ha=sahip olmak. gjøre=yapmak. si=söylemek.
+komme=gelmek. gå=gitmek. se=görmek. vite=bilmek. vet=biliyor. kan=-ebilir. vil=istiyor.
+skal=-ecek. må=zorunda. ta=almak. gi=vermek. finne=bulmak. tror=sanıyor. tenke=düşünmek.
+snakke=konuşmak. spise=yemek. drikke=içmek. sove=uyumak. bo=oturmak. lese=okumak.
+skrive=yazmak. lære=öğrenmek. hjelpe=yardım etmek. jobbe=çalışmak. kjøre=sürmek.
+sykle=bisiklete binmek. bygge=inşa etmek. håpe=ummak. stige=yükselmek. vise=göstermek.
+vinne=kazanmak. spare=biriktirmek. lage=yapmak. be=rica etmek. regne=yağmur yağmak.
+blåse=rüzgâr esmek. score=gol atmak. dag=gün. morgen=sabah. kveld=akşam. natt=gece.
+uke=hafta. år=yıl. time=saat. tid=zaman. søndag=pazar. neste=sonraki. vinter=kış.
+sommer=yaz. høst=sonbahar. vår=ilkbahar. vær=hava durumu. snø=kar. sol=güneş. vann=su.
+vind=rüzgâr. kald=soğuk. varm=sıcak. barn=çocuk. skole=okul. foreldre=ebeveynler. mor=anne.
+far=baba. bror=erkek kardeş. søster=kız kardeş. venn=arkadaş. mann=adam. kvinne=kadın.
+jente=kız. gutt=oğlan. menneske=insan. folk=halk, insanlar. familie=aile. land=ülke. by=şehir.
+hus=ev. hjem=ev, yuva. vei=yol. gate=sokak. bil=araba. tog=tren. buss=otobüs. fly=uçak.
+kommune=belediye. politi=polis. regjering=hükümet. penger=para. pris=fiyat. strøm=elektrik.
+arbeid=iş. jobb=iş. rapport=rapor. tall=sayı. ord=kelime. bok=kitap. mat=yemek. kamp=maç.
+lag=takım. mål=gol, hedef. omgang=devre. tusen=bin. hundre=yüz. ekspert=uzman. ny=yeni.
+gammel=eski. stor=büyük. liten=küçük. god=iyi. bedre=daha iyi. best=en iyi. dårlig=kötü.
+glad=mutlu. billig=ucuz. dyr=pahalı. lang=uzun. kort=kısa. sakte=yavaş. fort=hızlı.
+forsiktig=dikkatli. viktig=önemli. norsk=Norveççe. igjen=tekrar. ned=aşağı. opp=yukarı.
+ut=dışarı. inn=içeri. andre=diğer. to=iki. tre=üç. fire=dört. fem=beş. bru=köprü.
+åpne=açmak. kilometer=kilometre. tur=yolculuk. minutt=dakika. bygd=köy. ti=on.
+færre=daha az. sentrum=merkez. fjerne=kaldırmak. trikk=tramvay. luft=hava. sykehus=hastane.
+maskin=makine. lege=doktor. pasient=hasta. ventetid=bekleme süresi. stat=devlet.
+turist=turist. hotell=otel. nord=kuzey. sør=güney. full=dolu. vente=beklemek. gjest=misafir.
+starte=başlamak. tidlig=erken. elev=öğrenci. møte=buluşmak. klokka=saat. åtte=sekiz.
+synes=düşünmek. rektor=okul müdürü. fjell=dağ. ski=kayak. helg=hafta sonu. sjekke=kontrol etmek.
+først=önce. farlig=tehlikeli. høyde=yükseklik. norge=Norveç. oslo=Oslo. verden=dünya.
+regjeringen=hükümet. million=milyon. milliard=milyar. prosent=yüzde. sak=konu, dava.
+mener=düşünüyor. sier=söylüyor. får=alıyor. går=gidiyor. kom=geldi. tok=aldı. fikk=aldı.
+sa=söyledi. så=gördü. vant=kazandı. døde=öldü. død=ölüm. liv=hayat. barnehage=kreş.
+universitet=üniversite. forskning=araştırma. helse=sağlık. krig=savaş. fred=barış. valg=seçim.
+parti=parti. leder=lider. minister=bakan. dommer=hâkim. rett=mahkeme, hak. lov=yasa.
+bedrift=şirket. marked=piyasa. skatt=vergi. bolig=konut. leilighet=daire. flyktning=mülteci.`
+  .split(/[.\n]/).forEach((p) => {
+    const i = p.indexOf("=");
+    if (i > 0) DICT[p.slice(0, i).trim().toLowerCase()] = p.slice(i + 1).trim();
+  });
+
+function localLookup(w) {
+  const k = String(w).toLowerCase().replace(/[^a-zæøåéü-]/g, "");
+  if (!k) return null;
+  if (DICT[k]) return DICT[k];
+  for (const s of ["enes", "ene", "ane", "ens", "ets", "et", "en", "er", "ar", "es", "e", "a", "s"]) {
+    if (k.length > s.length + 1 && k.endsWith(s)) {
+      const b = k.slice(0, -s.length);
+      if (DICT[b]) return DICT[b];
+      if (b.length > 2 && b[b.length - 1] === b[b.length - 2] && DICT[b.slice(0, -1)]) return DICT[b.slice(0, -1)];
+    }
+  }
+  return null;
+}
+
+function gloss(sentence) {
+  const out = []; let hits = 0, total = 0;
+  for (const t of tokens(sentence)) {
+    if (!isWord(t)) continue;
+    total++;
+    const tr = localLookup(t);
+    if (tr) { hits++; out.push(t + " (" + tr + ")"); } else out.push(t);
+  }
+  if (!total || hits / total < 0.3) return null;
+  return out.join(" ");
+}
+
+/* =================== metin =================== */
+function sentences(text) {
+  const out = []; let cur = "";
+  for (const ch of String(text)) { cur += ch; if (ch === "." || ch === "!" || ch === "?") { out.push(cur.trim()); cur = ""; } }
+  if (cur.trim()) out.push(cur.trim());
+  return out.filter(Boolean);
+}
+function tokens(s) { return String(s).match(/[A-Za-zÆØÅæøåÉéÜüÖö'’-]+|[^A-Za-zÆØÅæøåÉéÜüÖö\s]+|\s+/g) || []; }
+function isWord(t) { return /^[A-Za-zÆØÅæøåÉéÜüÖö'’-]+$/.test(t); }
+
+function speak(text) {
+  try {
+    speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "nb-NO"; u.rate = 0.85;
+    const v = speechSynthesis.getVoices().find((x) => x.lang && x.lang.toLowerCase().startsWith("nb"));
+    if (v) u.voice = v;
+    speechSynthesis.speak(u);
+  } catch (e) {}
+}
+
+/* =================== sunucu =================== */
+async function ai(prompt, max) {
+  const r = await fetch("/api/ai", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt, max: max || 700 }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+  if (!d.text) throw new Error("Boş yanıt");
+  return d.text;
+}
+
+function toJSON(raw) {
+  const t = String(raw).replace(/```json/gi, "").replace(/```/g, "").trim();
+  try { return JSON.parse(t); } catch (e) {}
+  const objs = []; let depth = 0, start = -1;
+  for (let i = 0; i < t.length; i++) {
+    if (t[i] === "{") { if (depth === 0) start = i; depth++; }
+    else if (t[i] === "}") { depth--; if (depth === 0 && start >= 0) { try { objs.push(JSON.parse(t.slice(start, i + 1))); } catch (e) {} } }
+  }
+  if (objs.length === 1) return objs[0];
+  if (objs.length) return objs;
+  throw new Error("Yanıt okunamadı");
+}
+
+async function loadNews(niva) {
+  S.err = ""; S.saker = []; S.live = false; S.niva = niva; render();
+  try {
+    const r = await fetch("/api/news?niva=" + encodeURIComponent(niva));
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
+    S.saker = d.saker || []; S.niva = d.niva || niva; S.live = true;
+  } catch (e) {
+    S.err = String((e && e.message) || e);
+  }
+  render();
+}
+
+/* =================== bulmaca kurucu =================== */
+function buildGrid(entries) {
+  const seen = new Set(), list = [];
+  for (const e of entries) {
+    const w = String(e.word || "").toUpperCase().replace(/[^A-ZÆØÅ]/g, "");
+    if (w.length < 3 || w.length > 9 || seen.has(w)) continue;
+    seen.add(w); list.push({ word: w, clue: e.clue || "…" });
+  }
+  if (list.length < 2) return null;
+  list.sort((a, b) => b.word.length - a.word.length);
+
+  const cells = new Map(), placed = [], K = (r, c) => r + ":" + c;
+  const fits = (w, r, c, dir) => {
+    const dr = dir === "D" ? 1 : 0, dc = dir === "A" ? 1 : 0;
+    if (cells.has(K(r - dr, c - dc))) return false;
+    if (cells.has(K(r + dr * w.length, c + dc * w.length))) return false;
+    let cross = 0;
+    for (let i = 0; i < w.length; i++) {
+      const rr = r + dr * i, cc = c + dc * i, ex = cells.get(K(rr, cc));
+      if (ex) { if (ex !== w[i]) return false; cross++; }
+      else if (dir === "A") { if (cells.has(K(rr - 1, cc)) || cells.has(K(rr + 1, cc))) return false; }
+      else { if (cells.has(K(rr, cc - 1)) || cells.has(K(rr, cc + 1))) return false; }
+    }
+    return cross > 0;
+  };
+  const put = (e, r, c, dir) => {
+    const dr = dir === "D" ? 1 : 0, dc = dir === "A" ? 1 : 0;
+    for (let i = 0; i < e.word.length; i++) cells.set(K(r + dr * i, c + dc * i), e.word[i]);
+    placed.push({ word: e.word, clue: e.clue, r, c, dir });
+  };
+
+  put(list[0], 0, 0, "A");
+  for (const e of list.slice(1)) {
+    let best = null, score = -Infinity;
+    for (const p of placed) for (let pi = 0; pi < p.word.length; pi++) for (let wi = 0; wi < e.word.length; wi++) {
+      if (p.word[pi] !== e.word[wi]) continue;
+      const dir = p.dir === "A" ? "D" : "A";
+      const r = dir === "D" ? p.r - wi : p.r + pi;
+      const c = dir === "D" ? p.c + pi : p.c - wi;
+      if (!fits(e.word, r, c, dir)) continue;
+      const s = -(Math.abs(r) + Math.abs(c));
+      if (s > score) { score = s; best = { r, c, dir }; }
+    }
+    if (best) put(e, best.r, best.c, best.dir);
+  }
+  if (placed.length < 2) return null;
+
+  let minR = Infinity, minC = Infinity, maxR = -Infinity, maxC = -Infinity;
+  for (const k of cells.keys()) {
+    const [r, c] = k.split(":").map(Number);
+    minR = Math.min(minR, r); maxR = Math.max(maxR, r);
+    minC = Math.min(minC, c); maxC = Math.max(maxC, c);
+  }
+  const rows = maxR - minR + 1, cols = maxC - minC + 1;
+  const g = Array.from({ length: rows }, () => Array(cols).fill(null));
+  for (const [k, v] of cells) { const [r, c] = k.split(":").map(Number); g[r - minR][c - minC] = v; }
+
+  const nums = {}; let n = 0;
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    if (!g[r][c]) continue;
+    const sa = (c === 0 || !g[r][c - 1]) && c + 1 < cols && g[r][c + 1];
+    const sd = (r === 0 || !g[r - 1][c]) && r + 1 < rows && g[r + 1][c];
+    if (sa || sd) nums[r + ":" + c] = ++n;
+  }
+  const wordsOut = placed.map((p) => {
+    const r = p.r - minR, c = p.c - minC, cs = [];
+    for (let i = 0; i < p.word.length; i++) cs.push(p.dir === "A" ? r + ":" + (c + i) : (r + i) + ":" + c);
+    return { word: p.word, clue: p.clue, dir: p.dir, r, c, num: nums[r + ":" + c] || 0, cells: cs };
+  }).sort((a, b) => a.num - b.num);
+
+  return { rows, cols, g, nums, words: wordsOut };
+}
+
+const STARTER = [
+  { word: "VINTER", clue: "Den kaldeste årstiden" },
+  { word: "SKOLE", clue: "Her lærer barna å lese" },
+  { word: "REGN", clue: "Vann som faller fra himmelen" },
+  { word: "MORGEN", clue: "Tidlig på dagen" },
+  { word: "KAFFE", clue: "Svart og varm drikke" },
+  { word: "TOG", clue: "Det går på skinner" },
+  { word: "BOK", clue: "Den har mange sider og ord" },
+  { word: "SOMMER", clue: "Årstiden med ferie og sol" },
+];
+
+/* =================== çizim =================== */
+function render() {
+  document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === S.tab));
+  const c = $("#wcount");
+  c.hidden = S.words.length === 0; c.textContent = S.words.length;
+  const v = $("#view");
+  if (S.tab === "news") v.innerHTML = S.open === null ? viewFeed() : viewReader();
+  else if (S.tab === "words") v.innerHTML = viewWords();
+  else v.innerHTML = viewGame();
+  if (S.tab === "game" && S.puz) paintGrid();
+}
+
+function viewFeed() {
+  if (!S.saker.length && !S.err) return '<p class="status">Dagens nyheter hentes…</p>';
+  let h = "";
+  if (S.err) {
+    h += '<div style="padding:16px 0 0">' +
+      '<p class="note" style="margin-bottom:8px">Haberler alınamadı.</p>' +
+      '<p class="err">' + esc(S.err) + "</p>" +
+      '<div class="row" style="margin:0 0 8px"><button class="pri" data-act="reload">Tekrar dene</button></div></div>';
+  }
+  if (S.saker.length) {
+    h += '<div class="tools" style="border:0;padding:14px 0 6px;margin:0">' +
+      '<button class="chip' + (S.niva === "lett" ? " on" : "") + '" data-act="niva" data-n="lett">Kolay</button>' +
+      '<button class="chip' + (S.niva === "middels" ? " on" : "") + '" data-act="niva" data-n="middels">Orta</button>' +
+      '<button class="chip' + (S.niva === "original" ? " on" : "") + '" data-act="niva" data-n="original">Orijinal özet</button>' +
+      "</div>";
+    h += '<ul class="feed">' + S.saker.map((a, i) =>
+      '<li class="item"><button data-act="open" data-i="' + i + '">' +
+      '<span class="n">' + String(i + 1).padStart(2, "0") + "</span>" +
+      "<h2>" + esc(a.tittel) + "</h2><p>" + esc(a.tekst) + "</p></button></li>").join("") + "</ul>";
+  }
+  return h;
+}
+
+function viewReader() {
+  const a = S.saker[S.open];
+  const list = sentences(a.tekst);
+  S._sents = list;
+  let h = '<article class="read"><button class="back" data-act="back">← Haberler</button>' +
+    "<h2>" + esc(a.tittel) + "</h2>" +
+    '<div class="tools"><button class="chip" data-act="speak">Sesli oku</button>' +
+    (a.lenke ? '<a class="chip" href="' + esc(a.lenke) + '" target="_blank" rel="noreferrer">NRK\'de aç</a>' : "") +
+    '<span style="font-size:12.5px;color:var(--muted)">Kelimeye dokun</span></div><div class="prose">';
+
+  list.forEach((s, i) => {
+    h += "<span>";
+    tokens(s).forEach((t) => {
+      if (isWord(t)) {
+        const k = t.toLowerCase();
+        const cls = S.words.some((w) => w.key === k) ? "kept" : S.seen.has(k) ? "seen" : "";
+        h += '<button class="w ' + cls + '" data-act="word" data-w="' + esc(t) + '" data-s="' + i + '">' + esc(t) + "</button>";
+      } else h += esc(t);
+    });
+    h += '<button class="tr' + (S.trans[i] !== undefined ? " on" : "") + '" data-act="tr" data-i="' + i + '">' +
+      (S.busy === i ? "·" : "TR") + "</button></span>";
+    if (S.trans[i] !== undefined) h += '<span class="trline">' + S.trans[i] + "</span>";
+    h += " ";
+  });
+  return h + "</div></article>";
+}
+
+function viewWords() {
+  if (!S.words.length) return '<div class="empty"><h3>Kelime defterin boş</h3>' +
+    "<p>Haber okurken bilmediğin kelimeye dokun, açılan kartta “Kelime defterine ekle”ye bas. " +
+    "Beş kelime biriktirince bu kelimelerden bulmaca üretilir.</p></div>";
+  return '<ul class="wl">' + S.words.map((w) =>
+    '<li><span class="o">' + esc(w.word) + '</span><span class="t">' + esc(w.tr) + "</span>" +
+    '<button class="x" data-act="drop" data-k="' + esc(w.key) + '">×</button></li>').join("") + "</ul>" +
+    (S.words.length >= 5 ? '<div class="row"><button class="pri" data-act="gofromwords">Bu kelimelerle bulmaca</button></div>' : "");
+}
+
+function viewGame() {
+  if (!S.puz) {
+    return '<div class="empty"><h3>Kryssord</h3><p>' +
+      (S.words.length >= 5
+        ? "Kelime defterindeki kelimelerden, Norveççe tanımlı bir bulmaca üretebilirim."
+        : "Kelime defterinde 5 kelime olunca bulmaca senin kelimelerinden yapılır. Şimdilik başlangıç setiyle oynayabilirsin.") +
+      "</p>" + (S.msg ? '<p class="err">' + esc(S.msg) + "</p>" : "") +
+      '<div class="row" style="max-width:22rem;margin:0 auto">' +
+      (S.words.length >= 5 ? '<button class="pri" data-act="mkmine">Kelimelerimden</button>' : "") +
+      '<button data-act="mkstart">Başlangıç seti</button></div></div>';
+  }
+  const p = S.puz;
+  let h = '<div style="padding-top:14px"><div class="grid" id="grid" style="grid-template-columns:repeat(' + p.cols + ',1fr)">';
+  for (let r = 0; r < p.rows; r++) for (let c = 0; c < p.cols; c++) {
+    const k = r + ":" + c;
+    if (!p.g[r][c]) { h += '<div class="cell void"></div>'; continue; }
+    h += '<div class="cell" data-k="' + k + '">' + (p.nums[k] ? '<span class="num">' + p.nums[k] + "</span>" : "") +
+      '<input maxlength="1" inputmode="text" autocapitalize="characters" autocomplete="off" data-k="' + k + '">' + "</div>";
+  }
+  h += "</div>";
+  if (S.msg) h += '<p class="err">' + esc(S.msg) + "</p>";
+  h += '<div class="row"><button class="pri" data-act="check">Kontrol et</button>' +
+    '<button data-act="reveal">Cevaplar</button><button data-act="newpuz">Yeni</button></div>';
+  [["Vannrett", "A"], ["Loddrett", "D"]].forEach(([label, d]) => {
+    const arr = p.words.filter((w) => w.dir === d);
+    if (!arr.length) return;
+    h += '<h4 class="cluehead">' + label + "</h4>" + arr.map((w) =>
+      '<button class="clue" data-act="clue" data-k="' + w.cells[0] + '" data-d="' + d + '">' +
+      '<span class="cn">' + w.num + "</span><span>" + esc(w.clue) +
+      ' <span style="color:var(--muted)">(' + w.word.length + ")</span></span></button>").join("");
+  });
+  return h + "</div>";
+}
+
+function paintGrid() {
+  const p = S.puz;
+  const act = activeWord();
+  document.querySelectorAll("#grid .cell[data-k]").forEach((el) => {
+    const k = el.dataset.k;
+    el.classList.toggle("hi", !!(act && act.cells.includes(k)));
+    el.classList.toggle("cur", S.cur === k);
+    el.classList.toggle("bad", !!S.bad[k]);
+    const inp = el.querySelector("input");
+    if (inp.value !== (S.ans[k] || "")) inp.value = S.ans[k] || "";
+  });
+}
+function activeWord() {
+  if (!S.puz || !S.cur) return null;
+  return S.puz.words.find((w) => w.dir === S.dir && w.cells.includes(S.cur))
+    || S.puz.words.find((w) => w.cells.includes(S.cur)) || null;
+}
+
+/* =================== sözlük kartı =================== */
+function showSheet(html) { $("#sheetHost").innerHTML = '<div class="scrim" data-act="close"></div><div class="sheet">' + html + "</div>"; }
+function closeSheet() { $("#sheetHost").innerHTML = ""; }
+
+async function lookup(word, si) {
+  const clean = String(word).replace(/[^A-Za-zÆØÅæøåÉéÜüÖö'’-]/g, "");
+  if (!clean) return;
+  const key = clean.toLowerCase();
+  S.seen.add(key); render();
+
+  showSheet('<div class="grab"></div><h3 class="hw">' + esc(clean) + "</h3>" +
+    '<div style="margin-top:18px"><div class="skel" style="width:45%"></div>' +
+    '<div class="skel" style="width:80%;height:20px"></div><div class="skel" style="width:60%"></div></div>');
+
+  const sentence = (S._sents && S._sents[si]) || "";
+  let d = null, errMsg = "";
+  try {
+    d = toJSON(await ai(
+      'Du er en norsk-tyrkisk ordbok for en tyrkisk nybegynner (A1-A2).\nOrd: "' + clean + '"\nSetning: "' + sentence +
+      '"\nSvar KUN med JSON:\n{"grunnform":"","ordklasse":"substantiv/verb/adjektiv/adverb/preposisjon/pronomen",' +
+      '"tyrkisk":"kelimenin bu cümledeki Türkçe karşılığı","not":"Türkçe tek cümlelik kullanım notu",' +
+      '"eksempel":"enkel norsk setning","eksempel_tr":"Türkçesi"}'));
+  } catch (e) {
+    errMsg = String((e && e.message) || e);
+    const off = localLookup(clean);
+    if (off) d = { tyrkisk: off, grunnform: clean.toLowerCase(), ordklasse: "yerleşik sözlük", offline: 1 };
+  }
+
+  const kept = S.words.some((w) => w.key === key);
+  let h = '<div class="grab"></div><h3 class="hw">' + esc(clean) + "</h3>";
+  if (!d) {
+    h += '<p class="note" style="margin-top:14px">Anlam getirilemedi.</p><p class="err">' + esc(errMsg) + "</p>";
+  } else {
+    S._last = { key, word: d.grunnform || clean, tr: d.tyrkisk || "" };
+    h += '<p class="meta">' + esc([d.grunnform, d.ordklasse].filter(Boolean).join(", ")) + "</p>" +
+      '<p class="mean">' + esc(d.tyrkisk) + "</p>";
+    if (d.offline) h += '<p class="note" style="color:var(--red)">Çeviri servisine ulaşılamadı, bu karşılık uygulamanın içindeki temel sözlükten geliyor.</p>';
+    else if (d.not) h += '<p class="note">' + esc(d.not) + "</p>";
+    if (d.eksempel) h += '<div class="ex"><p class="nb">' + esc(d.eksempel) +
+      ' <button class="tr" data-act="say" data-t="' + esc(d.eksempel) + '">♪</button></p>' +
+      '<p class="tk">' + esc(d.eksempel_tr || "") + "</p></div>";
+    h += '<button class="add' + (kept ? " done" : "") + '" data-act="' + (kept ? "close" : "keep") + '">' +
+      (kept ? "Kelime defterinde ✓" : "Kelime defterine ekle") + "</button>";
+  }
+  showSheet(h);
+}
+
+async function translateSentence(i) {
+  if (S.trans[i] !== undefined) { delete S.trans[i]; render(); return; }
+  S.busy = i; render();
+  const s = S._sents[i];
+  try {
+    const d = toJSON(await ai('Oversett denne norske setningen til naturlig, enkel tyrkisk.\nSetning: "' + s +
+      '"\nSvar KUN med JSON: {"tr":"Türkçe çeviri"}'));
+    if (!d.tr) throw new Error("boş");
+    S.trans[i] = esc(d.tr);
+  } catch (e) {
+    const g = gloss(s);
+    S.trans[i] = g
+      ? "<em>Çeviri servisine ulaşılamadı — kelime kelime:</em>" + esc(g)
+      : "<em>Çeviri alınamadı.</em>" + esc(String((e && e.message) || e));
+  }
+  S.busy = null; render();
+}
+
+/* =================== bulmaca kurma =================== */
+function startPuzzle(entries) {
+  const g = buildGrid(entries);
+  if (!g) { S.msg = "Bu kelimelerden ızgara kurulamadı, birkaç kelime daha ekle."; render(); return; }
+  S.puz = g; S.ans = {}; S.bad = {}; S.dir = "A"; S.msg = "";
+  S.cur = g.words[0] ? g.words[0].cells[0] : null;
+  render();
+}
+
+async function puzzleFromWords() {
+  const picked = S.words.slice(0, 9);
+  S.msg = "Tanımlar hazırlanıyor…"; render();
+  try {
+    const arr = toJSON(await ai("Lag én enkel norsk forklaring (A2-nivå, maks 8 ord) til hvert ord. " +
+      "Ikke bruk selve ordet i forklaringen.\nOrd: " + JSON.stringify(picked.map((w) => w.word)) +
+      '\nSvar KUN med JSON: [{"ord":"","hint":""}]', 900));
+    const map = {};
+    (Array.isArray(arr) ? arr : [arr]).forEach((x) => { if (x && x.ord) map[String(x.ord).toUpperCase()] = x.hint; });
+    startPuzzle(picked.map((w) => ({ word: w.word, clue: map[String(w.word).toUpperCase()] || w.tr || "…" })));
+  } catch (e) {
+    startPuzzle(picked.map((w) => ({ word: w.word, clue: w.tr || "…" })));
+  }
+}
+
+/* =================== olaylar =================== */
+document.addEventListener("click", (ev) => {
+  const el = ev.target.closest("[data-act]");
+  if (!el) return;
+  const a = el.dataset.act;
+
+  if (a === "open") { S.open = +el.dataset.i; S.trans = {}; render(); }
+  else if (a === "back") { S.open = null; S.trans = {}; render(); }
+  else if (a === "reload") loadNews(S.niva || "lett");
+  else if (a === "niva") loadNews(el.dataset.n);
+  else if (a === "speak") speak(S.saker[S.open].tekst);
+  else if (a === "say") speak(el.dataset.t);
+  else if (a === "word") lookup(el.dataset.w, +el.dataset.s);
+  else if (a === "tr") translateSentence(+el.dataset.i);
+  else if (a === "close") closeSheet();
+  else if (a === "keep") {
+    if (S._last && !S.words.some((w) => w.key === S._last.key)) { S.words.unshift(S._last); saveWords(); }
+    closeSheet(); render();
+  }
+  else if (a === "drop") { S.words = S.words.filter((w) => w.key !== el.dataset.k); saveWords(); render(); }
+  else if (a === "gofromwords") { S.tab = "game"; S.puz = null; render(); puzzleFromWords(); }
+  else if (a === "mkmine") puzzleFromWords();
+  else if (a === "mkstart") startPuzzle(STARTER);
+  else if (a === "newpuz") { S.puz = null; S.msg = ""; render(); }
+  else if (a === "check") {
+    const b = {}; let full = true, wrong = 0;
+    S.puz.words.forEach((w) => w.cells.forEach((k, i) => {
+      if (!S.ans[k]) full = false; else if (S.ans[k] !== w.word[i]) { b[k] = 1; wrong++; }
+    }));
+    S.bad = b;
+    S.msg = wrong ? wrong + " harf yanlış." : full ? "Ferdig! Alt er riktig." : "Boş kareler var.";
+    render();
+  }
+  else if (a === "reveal") {
+    S.puz.words.forEach((w) => w.cells.forEach((k, i) => { S.ans[k] = w.word[i]; }));
+    S.bad = {}; S.msg = ""; render();
+  }
+  else if (a === "clue") {
+    S.dir = el.dataset.d; S.cur = el.dataset.k; render();
+    const inp = document.querySelector('#grid input[data-k="' + S.cur + '"]');
+    if (inp) inp.focus();
+  }
+});
+
+document.querySelectorAll(".tabs button").forEach((b) =>
+  b.addEventListener("click", () => { S.tab = b.dataset.tab; S.msg = ""; render(); }));
+
+document.addEventListener("input", (ev) => {
+  const inp = ev.target.closest("#grid input");
+  if (!inp) return;
+  const k = inp.dataset.k;
+  const ch = (inp.value || "").slice(-1).toUpperCase();
+  if (ch && !/[A-ZÆØÅ]/.test(ch)) { inp.value = S.ans[k] || ""; return; }
+  S.ans[k] = ch; delete S.bad[k];
+  inp.value = ch;
+  if (ch) {
+    const w = activeWord();
+    if (w) { const nx = w.cells[w.cells.indexOf(k) + 1]; if (nx) { S.cur = nx; const n = document.querySelector('#grid input[data-k="' + nx + '"]'); if (n) n.focus(); } }
+  }
+  paintGrid();
+});
+
+document.addEventListener("keydown", (ev) => {
+  const inp = ev.target.closest("#grid input");
+  if (!inp) return;
+  const k = inp.dataset.k;
+  if (ev.key === "Backspace" && !S.ans[k]) {
+    ev.preventDefault();
+    const w = activeWord();
+    if (w) { const pv = w.cells[w.cells.indexOf(k) - 1]; if (pv) { S.cur = pv; delete S.ans[pv]; const n = document.querySelector('#grid input[data-k="' + pv + '"]'); if (n) n.focus(); paintGrid(); } }
+  }
+});
+
+document.addEventListener("focusin", (ev) => {
+  const inp = ev.target.closest("#grid input");
+  if (!inp) return;
+  if (S.cur === inp.dataset.k) S.dir = S.dir === "A" ? "D" : "A";
+  S.cur = inp.dataset.k;
+  paintGrid();
+});
+
+/* =================== başlat =================== */
+const DAYS = ["søndag", "mandag", "tirsdag", "onsdag", "torsdag", "fredag", "lørdag"];
+const MONTHS = ["januar", "februar", "mars", "april", "mai", "juni", "juli", "august", "september", "oktober", "november", "desember"];
+const t = new Date();
+$("#dateline").textContent = DAYS[t.getDay()] + " " + t.getDate() + ". " + MONTHS[t.getMonth()];
+
+S.words = loadWords();
+render();
+loadNews("lett");
+</script>
+</body>
+</html>
