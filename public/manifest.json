@@ -1,0 +1,11 @@
+{
+  "name": "Dagsord",
+  "short_name": "Dagsord",
+  "description": "Norveççe haberleri kolay dilde oku, kelimelere dokun, Türkçesini gör.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#E8ECF1",
+  "theme_color": "#E8ECF1",
+  "orientation": "portrait",
+  "lang": "tr"
+}
