@@ -244,13 +244,32 @@ function sentences(text) {
 function tokens(s) { return String(s).match(/[A-Za-zÆØÅæøåÉéÜüÖö'’-]+|[^A-Za-zÆØÅæøåÉéÜüÖö\s]+|\s+/g) || []; }
 function isWord(t) { return /^[A-Za-zÆØÅæøåÉéÜüÖö'’-]+$/.test(t); }
 
+let VOICES = [];
+function refreshVoices() { try { VOICES = speechSynthesis.getVoices() || []; } catch (e) { VOICES = []; } }
+refreshVoices();
+try { speechSynthesis.addEventListener("voiceschanged", refreshVoices); } catch (e) {}
+
+function norskVoice() {
+  if (!VOICES.length) refreshVoices();
+  return VOICES.find((v) => /^(nb|nn|no)\b|^(nb|nn|no)[-_]/i.test(v.lang || ""))
+      || VOICES.find((v) => /norsk|norweg/i.test(v.name || ""))
+      || null;
+}
+
 function speak(text) {
   try {
     speechSynthesis.cancel();
+    const v = norskVoice();
+    if (!v) {
+      S.sesUyari = "Bu cihazda Norveççe ses yüklü değil, o yüzden okumuyorum — yanlış aksanla dinlemek zarar verir. " +
+        "iPhone: Ayarlar > Erişilebilirlik > Konuşulan İçerik > Sesler > Norsk Bokmål indir. " +
+        "Windows: Ayarlar > Saat ve Dil > Dil > Dil ekle > Norsk bokmål (konuşma paketiyle).";
+      render();
+      return;
+    }
+    S.sesUyari = "";
     const u = new SpeechSynthesisUtterance(text);
-    u.lang = "nb-NO"; u.rate = 0.85;
-    const v = speechSynthesis.getVoices().find((x) => x.lang && x.lang.toLowerCase().startsWith("nb"));
-    if (v) u.voice = v;
+    u.voice = v; u.lang = v.lang || "nb-NO"; u.rate = 0.85;
     speechSynthesis.speak(u);
   } catch (e) {}
 }
@@ -282,16 +301,22 @@ function toJSON(raw) {
 }
 
 async function loadNews(niva) {
-  S.err = ""; S.saker = []; S.live = false; S.niva = niva; render();
+  S.err = ""; S.advarsel = ""; S.saker = []; S.open = null; S.niva = niva; S.loading = true; render();
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), 75000);
   try {
-    const r = await fetch("/api/news?niva=" + encodeURIComponent(niva));
+    const r = await fetch("/api/news?niva=" + encodeURIComponent(niva), { signal: ctrl.signal });
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
     S.saker = d.saker || []; S.niva = d.niva || niva; S.live = true;
     S.advarsel = d.advarsel || "";
   } catch (e) {
-    S.err = String((e && e.message) || e);
+    S.err = (e && e.name === "AbortError")
+      ? "Sunucu 75 saniyede yanıt vermedi. Orta seviye uzun metin ürettiği için ağır olabilir; tekrar dene veya Kolay seviyeye geç."
+      : String((e && e.message) || e);
   }
+  clearTimeout(timer);
+  S.loading = false;
   render();
 }
 
@@ -392,21 +417,24 @@ function render() {
 }
 
 function viewFeed() {
-  if (!S.saker.length && !S.err) return '<p class="status">Dagens nyheter hentes…</p>';
-  let h = "";
-  if (S.err) {
-    h += '<div style="padding:16px 0 0">' +
-      '<p class="note" style="margin-bottom:8px">Haberler alınamadı.</p>' +
-      '<p class="err">' + esc(S.err) + "</p>" +
-      '<div class="row" style="margin:0 0 8px"><button class="pri" data-act="reload">Tekrar dene</button></div></div>';
+  let h = '<div class="tools" style="border:0;padding:14px 0 6px;margin:0">' +
+    '<button class="chip' + (S.niva === "lett" ? " on" : "") + '" data-act="niva" data-n="lett">Kolay</button>' +
+    '<button class="chip' + (S.niva === "middels" ? " on" : "") + '" data-act="niva" data-n="middels">Orta</button>' +
+    '<button class="chip' + (S.niva === "original" ? " on" : "") + '" data-act="niva" data-n="original">Başlıklar</button>' +
+    "</div>";
+
+  if (S.advarsel) h += '<p class="err">' + esc(S.advarsel) + "</p>";
+  if (S.err) h += '<p class="err">' + esc(S.err) + "</p>" +
+    '<div class="row" style="margin:0 0 8px"><button class="pri" data-act="reload">Tekrar dene</button></div>';
+
+  if (S.loading) {
+    h += '<p class="status">Metinler hazırlanıyor…<br><span style="font-size:12.5px">' +
+      (S.niva === "original" ? "Birkaç saniye." : "Uzun metinler yazılıyor, 20-40 saniye sürebilir.") +
+      "</span></p>";
+    return h;
   }
+
   if (S.saker.length) {
-    h += '<div class="tools" style="border:0;padding:14px 0 6px;margin:0">' +
-      '<button class="chip' + (S.niva === "lett" ? " on" : "") + '" data-act="niva" data-n="lett">Kolay</button>' +
-      '<button class="chip' + (S.niva === "middels" ? " on" : "") + '" data-act="niva" data-n="middels">Orta</button>' +
-      '<button class="chip' + (S.niva === "original" ? " on" : "") + '" data-act="niva" data-n="original">Orijinal özet</button>' +
-      "</div>";
-    if (S.advarsel) h += '<p class="err">' + esc(S.advarsel) + '\n\nTeşhis için /api/test adresini aç.</p>';
     h += '<ul class="feed">' + S.saker.map((a, i) =>
       '<li class="item"><button data-act="open" data-i="' + i + '">' +
       '<span class="n">' + String(i + 1).padStart(2, "0") + "</span>" +
@@ -423,7 +451,9 @@ function viewReader() {
     "<h2>" + esc(a.tittel) + "</h2>" +
     '<div class="tools"><button class="chip" data-act="speak">Sesli oku</button>' +
     (a.lenke ? '<a class="chip" href="' + esc(a.lenke) + '" target="_blank" rel="noreferrer">NRK\'de aç</a>' : "") +
-    '<span style="font-size:12.5px;color:var(--muted)">Kelimeye dokun</span></div><div class="prose">';
+    '<span style="font-size:12.5px;color:var(--muted)">Kelimeye dokun</span></div>' +
+    (S.sesUyari ? '<p class="err">' + esc(S.sesUyari) + "</p>" : "") +
+    '<div class="prose">';
 
   list.forEach((s, i) => {
     h += "<span>";
