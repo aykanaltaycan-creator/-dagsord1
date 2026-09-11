@@ -288,6 +288,7 @@ async function loadNews(niva) {
     const d = await r.json();
     if (!r.ok) throw new Error(d.error || ("HTTP " + r.status));
     S.saker = d.saker || []; S.niva = d.niva || niva; S.live = true;
+    S.advarsel = d.advarsel || "";
   } catch (e) {
     S.err = String((e && e.message) || e);
   }
@@ -405,6 +406,7 @@ function viewFeed() {
       '<button class="chip' + (S.niva === "middels" ? " on" : "") + '" data-act="niva" data-n="middels">Orta</button>' +
       '<button class="chip' + (S.niva === "original" ? " on" : "") + '" data-act="niva" data-n="original">Orijinal özet</button>' +
       "</div>";
+    if (S.advarsel) h += '<p class="err">' + esc(S.advarsel) + '\n\nTeşhis için /api/test adresini aç.</p>';
     h += '<ul class="feed">' + S.saker.map((a, i) =>
       '<li class="item"><button data-act="open" data-i="' + i + '">' +
       '<span class="n">' + String(i + 1).padStart(2, "0") + "</span>" +
@@ -538,7 +540,7 @@ async function lookup(word, si) {
     S._last = { key, word: d.grunnform || clean, tr: d.tyrkisk || "" };
     h += '<p class="meta">' + esc([d.grunnform, d.ordklasse].filter(Boolean).join(", ")) + "</p>" +
       '<p class="mean">' + esc(d.tyrkisk) + "</p>";
-    if (d.offline) h += '<p class="note" style="color:var(--red)">Çeviri servisine ulaşılamadı, bu karşılık uygulamanın içindeki temel sözlükten geliyor.</p>';
+    if (d.offline) h += '<p class="note" style="color:var(--red)">Sunucu yanıt vermedi, bu karşılık uygulamanın içindeki temel sözlükten geliyor.</p><p class="err">' + esc(errMsg) + "</p>";
     else if (d.not) h += '<p class="note">' + esc(d.not) + "</p>";
     if (d.eksempel) h += '<div class="ex"><p class="nb">' + esc(d.eksempel) +
       ' <button class="tr" data-act="say" data-t="' + esc(d.eksempel) + '">♪</button></p>' +
@@ -559,10 +561,11 @@ async function translateSentence(i) {
     if (!d.tr) throw new Error("boş");
     S.trans[i] = esc(d.tr);
   } catch (e) {
+    const msg = esc(String((e && e.message) || e));
     const g = gloss(s);
     S.trans[i] = g
-      ? "<em>Çeviri servisine ulaşılamadı — kelime kelime:</em>" + esc(g)
-      : "<em>Çeviri alınamadı.</em>" + esc(String((e && e.message) || e));
+      ? "<em>Sunucu çeviremedi (" + msg + ") — kelime kelime:</em>" + esc(g)
+      : "<em>Çeviri alınamadı:</em>" + msg;
   }
   S.busy = null; render();
 }
